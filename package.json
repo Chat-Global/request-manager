@@ -1,0 +1,20 @@
+{
+  "name": "request-manager",
+  "version": "1.0.0",
+  "description": "Chat Global Request Manager",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "ts-node src/index"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Chat-Global/request-manager.git"
+  },
+  "keywords": [],
+  "author": "tnfAngel",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Chat-Global/request-manager/issues"
+  },
+  "homepage": "https://github.com/Chat-Global/request-manager#readme"
+}
