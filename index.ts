@@ -4,7 +4,8 @@ const express = require('express');
 
 const app = express();
 
-const port = process.env.PORT || 4000;
+const { port, auth: authorization } = require('./config');
+
 const server = createServer(app);
 const io = new Server(server);
 
@@ -32,20 +33,18 @@ app.get('/', (req, res) => {
 setInterval(() => {
     const botClients = io.sockets.adapter.rooms.get('Bots');
 
-
     botConnections = botClients ? botClients.size : 0;
 
     const requestClients = io.sockets.adapter.rooms.get('RequestClients');
 
-
     requestClientConnections = requestClients ? requestClients.size : 0;
 
-}, 10)
+}, 50)
 
 io.use((socket, next) => {
 	if (socket.handshake.auth && socket.handshake.auth.token) {
         if (!socket.handshake.auth.client) return next(new Error('Malformed handshake auth error'));
-		if (socket.handshake.auth.token !== process.env.REQUEST_AUTH) {
+		if (socket.handshake.auth.token !== authorization) {
 			return next(new Error('Authentication error'));
 		} else {
 			next();
@@ -58,7 +57,10 @@ io.use((socket, next) => {
     try {
         if (socket.handshake.auth.client == 'Bot') {
             socket.join('Bots');
-            console.log(`[WebSocket] (BOT_CLIENT) A connection has been made. (${socket.id}) ${socket.adapter.sids.size} connected clients.`);
+
+            botConnections = io.sockets.adapter.rooms.get('Bots') ? io.sockets.adapter.rooms.get('Bots').size : 0;
+
+            console.log(`[WebSocket] (BOT_CLIENT) A connection has been made. (${socket.id}) ${botConnections} connected clients.`);
 
             socket.on('error', (err: any) => {
                 console.log('Socket error');
@@ -76,11 +78,15 @@ io.use((socket, next) => {
             });
 
             socket.on('disconnect', (reason: string) => {
-                console.log(`[WebSocket] (BOT_CLIENT) Socket ${socket.id} disconnected. (${reason}) ${socket.adapter.sids.size} connected clients.`);
+                botConnections = io.sockets.adapter.rooms.get('Bots') ? io.sockets.adapter.rooms.get('Bots').size : 0;
+                console.log(`[WebSocket] (BOT_CLIENT) Socket ${socket.id} disconnected. (${reason}) ${botConnections} connected clients.`);
             });
         } else if (socket.handshake.auth.client == 'RequestClient') {
             socket.join('RequestClients');
-            console.log(`[WebSocket] (REQUEST_CLIENT) A connection has been made. (${socket.id}) ${socket.adapter.sids.size} connected clients.`);
+
+            requestClientConnections = io.sockets.adapter.rooms.get('RequestClients') ? io.sockets.adapter.rooms.get('RequestClients').size : 0;
+
+            console.log(`[WebSocket] (REQUEST_CLIENT) A connection has been made. (${socket.id}) ${requestClientConnections} connected clients.`);
 
             socket.on('error', (err: any) => {
                 console.log('Socket error');
@@ -94,7 +100,8 @@ io.use((socket, next) => {
             });
 
             socket.on('disconnect', (reason: string) => {
-                console.log(`[WebSocket] (REQUEST_CLIENT) Socket ${socket.id} disconnected. (${reason}) ${socket.adapter.sids.size} connected clients.`);
+                requestClientConnections = io.sockets.adapter.rooms.get('RequestClients') ? io.sockets.adapter.rooms.get('RequestClients').size : 0;
+                console.log(`[WebSocket] (REQUEST_CLIENT) Socket ${socket.id} disconnected. (${reason}) ${requestClientConnections} connected clients.`);
             });
         }
 
