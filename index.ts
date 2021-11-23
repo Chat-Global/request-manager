@@ -18,9 +18,9 @@ app.set('json spaces', 2);
 
 app.use(express.json());
 app.use(
-	express.urlencoded({
-		extended: false
-	})
+    express.urlencoded({
+        extended: false
+    })
 );
 
 let botConnections = 0;
@@ -39,20 +39,20 @@ setInterval(() => {
 
     requestClientConnections = requestClients ? requestClients.size : 0;
 
-}, 50)
+}, 50);
 
 io.use((socket, next) => {
-	if (socket.handshake.auth && socket.handshake.auth.token) {
+    if (socket.handshake.auth && socket.handshake.auth.token) {
         if (!socket.handshake.auth.client) return next(new Error('Malformed handshake auth error'));
-		if (socket.handshake.auth.token !== authorization) {
-			return next(new Error('Authentication error'));
-		} else {
-			next();
-		}
-        
-	} else {
-		next(new Error('Authentication error'));
-	}
+        if (socket.handshake.auth.token !== authorization) {
+            return next(new Error('Authentication error'));
+        } else {
+            next();
+        }
+
+    } else {
+        next(new Error('Authentication error'));
+    }
 }).on('connection', (socket) => {
     try {
         if (socket.handshake.auth.client == 'Bot') {
@@ -70,11 +70,11 @@ io.use((socket, next) => {
             });
 
             socket.on('ping', (callback: any) => {
-                callback();  
+                callback();
             });
 
             socket.on('requests', (request: any[], callback: any) => {
-                callback({ sas: 'fresca'});  
+                callback({ sas: 'fresca' });
             });
 
             socket.on('disconnect', (reason: string) => {
@@ -96,7 +96,7 @@ io.use((socket, next) => {
             });
 
             socket.on('ping', (callback: any) => {
-                callback();  
+                callback();
             });
 
             socket.on('disconnect', (reason: string) => {
@@ -111,5 +111,5 @@ io.use((socket, next) => {
 });
 
 server.listen(app.get('port'), () => {
-	console.log(`[WebServer] App listening on port ${app.get('port')}`);
+    console.log(`[WebServer] App listening on port ${app.get('port')}`);
 });
