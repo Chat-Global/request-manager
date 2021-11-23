@@ -22,11 +22,25 @@ app.use(
 	})
 );
 
-let connections = 0;
+let botConnections = 0;
+let requestClientConnections = 0;
 
 app.get('/', (req, res) => {
-    res.status(200).json({ connections: connections });
+    res.status(200).json({ botConnections: botConnections, requestClientConnections: requestClientConnections });
 })
+
+setInterval(() => {
+    const botClients = io.sockets.adapter.rooms.get('Bots');
+
+
+    botConnections = botClients ? botClients.size : 0;
+
+    const requestClients = io.sockets.adapter.rooms.get('RequestClients');
+
+
+    requestClientConnections = requestClients ? requestClients.size : 0;
+
+}, 10)
 
 io.use((socket, next) => {
 	if (socket.handshake.auth && socket.handshake.auth.token) {
@@ -42,32 +56,50 @@ io.use((socket, next) => {
 	}
 }).on('connection', (socket) => {
     try {
-        console.log(socket.handshake.auth)
-        connections = socket.adapter.sids.size;
-        console.log(`[WebSocket] A connection has been made. (${socket.id}) ${socket.adapter.sids.size} connected clients.`);
+        if (socket.handshake.auth.client == 'Bot') {
+            socket.join('Bots');
+            console.log(`[WebSocket] (BOT_CLIENT) A connection has been made. (${socket.id}) ${socket.adapter.sids.size} connected clients.`);
 
-        socket.on('error', (err: any) => {
-            console.log('Socket error');
-            if (err) {
-                socket.disconnect();
-            }
-        });
+            socket.on('error', (err: any) => {
+                console.log('Socket error');
+                if (err) {
+                    socket.disconnect();
+                }
+            });
 
-        socket.on('ping', (callback: any) => {
-            callback();  
-        });
+            socket.on('ping', (callback: any) => {
+                callback();  
+            });
 
-        socket.on('requests', (request: any[], callback: any) => {
-            callback({ sas: 'fresca'});  
-        });
+            socket.on('requests', (request: any[], callback: any) => {
+                callback({ sas: 'fresca'});  
+            });
 
-        socket.on('disconnect', (reason: string) => {
-            connections = socket.adapter.sids.size;
-            console.log(`[WebSocket] Socket ${socket.id} disconnected. (${reason}) ${socket.adapter.sids.size} connected clients.`);
-        });
+            socket.on('disconnect', (reason: string) => {
+                console.log(`[WebSocket] (BOT_CLIENT) Socket ${socket.id} disconnected. (${reason}) ${socket.adapter.sids.size} connected clients.`);
+            });
+        } else if (socket.handshake.auth.client == 'RequestClient') {
+            socket.join('RequestClients');
+            console.log(`[WebSocket] (REQUEST_CLIENT) A connection has been made. (${socket.id}) ${socket.adapter.sids.size} connected clients.`);
+
+            socket.on('error', (err: any) => {
+                console.log('Socket error');
+                if (err) {
+                    socket.disconnect();
+                }
+            });
+
+            socket.on('ping', (callback: any) => {
+                callback();  
+            });
+
+            socket.on('disconnect', (reason: string) => {
+                console.log(`[WebSocket] (REQUEST_CLIENT) Socket ${socket.id} disconnected. (${reason}) ${socket.adapter.sids.size} connected clients.`);
+            });
+        }
 
     } catch (e) {
-        console.log(e.toString())
+        console.log(e.toString());
     }
 });
 
