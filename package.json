@@ -4,7 +4,7 @@
   "description": "Chat Global Request Manager",
   "main": "src/index.ts",
   "scripts": {
-    "start": "ts-node src/index"
+    "start": "ts-node src/index.ts"
   },
   "repository": {
     "type": "git",
@@ -16,5 +16,9 @@
   "bugs": {
     "url": "https://github.com/Chat-Global/request-manager/issues"
   },
-  "homepage": "https://github.com/Chat-Global/request-manager#readme"
+  "homepage": "https://github.com/Chat-Global/request-manager#readme",
+  "dependencies": {
+    "express": "^4.17.1",
+    "socket.io": "^4.4.0"
+  }
 }
