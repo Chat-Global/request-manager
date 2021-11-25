@@ -27,11 +27,30 @@ let botConnections = 0;
 let requestClientConnections = 0;
 
 app.get('/', (req, res) => {
-    res.status(200).json({ botConnections: botConnections, requestClientConnections: requestClientConnections });
+    res.status(200).json({ 
+        botConnections: botConnections, 
+        requestClientConnections: requestClientConnections,
+        botClients: io.sockets.adapter.rooms.get('BotClients') ? Array.from(io.sockets.adapter.rooms.get('BotClients').keys()).map(socketID => {
+            const socket = io.sockets.sockets.get(socketID);
+            return {
+                socketID: socketID,
+                client: socket.handshake.auth.client,
+                type: socket.handshake.auth.type
+            };
+        }) : [],
+        requestClients: io.sockets.adapter.rooms.get('RequestClients') ? Array.from(io.sockets.adapter.rooms.get('RequestClients').keys()).map(socketID => {
+            const socket = io.sockets.sockets.get(socketID);
+            return {
+                socketID: socketID,
+                client: socket.handshake.auth.client,
+                type: socket.handshake.auth.type
+            };
+        }) : []
+    });
 })
 
 setInterval(() => {
-    const botClients = io.sockets.adapter.rooms.get('Bots');
+    const botClients = io.sockets.adapter.rooms.get('BotClients');
 
     botConnections = botClients ? botClients.size : 0;
 
@@ -55,10 +74,10 @@ io.use((socket, next) => {
     }
 }).on('connection', (socket) => {
     try {
-        if (socket.handshake.auth.client == 'Bot') {
-            socket.join('Bots');
+        if (socket.handshake.auth.type == 'BotClient') {
+            socket.join('BotClients');
 
-            botConnections = io.sockets.adapter.rooms.get('Bots') ? io.sockets.adapter.rooms.get('Bots').size : 0;
+            botConnections = io.sockets.adapter.rooms.get('BotClients') ? io.sockets.adapter.rooms.get('BotClients').size : 0;
 
             console.log(`[WebSocket] (BOT_CLIENT) A connection has been made. (${socket.id}) ${botConnections} connected clients.`);
 
@@ -73,15 +92,76 @@ io.use((socket, next) => {
                 callback();
             });
 
-            socket.on('requests', (request: any[], callback: any) => {
-                callback({ sas: 'fresca' });
+            socket.on('request', (request: any, callback: any) => {
+                const sockets = io.sockets.adapter.rooms.get('RequestClients') ? Array.from(io.sockets.adapter.rooms.get('RequestClients').keys()) : [];
+
+                if (sockets.length === 0) return callback({ status: 'error', text: 'No RequestClients availables.' });
+
+                io.sockets.sockets.get(sockets[~~(Math.random() * sockets.length)]).emit('request', request, (response) => {
+                    callback(
+                        response
+                    );
+                });
+
+            });
+
+            socket.on('requests', async (requests: any[], callback: any) => {
+                const sockets = io.sockets.adapter.rooms.get('RequestClients') ? Array.from(io.sockets.adapter.rooms.get('RequestClients').keys()) : [];
+
+                const socketsSize = sockets.length;
+
+                if (sockets.length === 0) return callback({ status: 'error', text: 'No RequestClients availables.' });
+
+                let requestIndex = 0;
+
+                const requestsArr = requests.map((request) => {
+                    const result = {
+                        request: request,
+                        index: requestIndex
+                    }
+                    requestIndex++;
+                    return result;
+                });
+
+                const chunkedRequests = [];
+
+                const requestsArrLength = requestsArr.length;
+
+                let [...array] = requestsArr;
+
+                for (let i = socketsSize; i > 0; i--) {
+                    chunkedRequests.push(array.splice(0, Math.ceil(requestsArrLength / i)));
+                }
+
+                let socketIndex = 0;
+
+                const responses = [];
+
+                console.log(chunkedRequests.length)
+
+                for (const socketRequests of chunkedRequests) {
+                    if (socketRequests.length == 0) continue;
+                    console.log(sockets[socketIndex], sockets, socketIndex);
+                    responses.push(
+                        await new Promise((resolve, reject) => {
+                            io.sockets.sockets.get(sockets[socketIndex]).emit('requests', socketRequests, (response) => {
+                                resolve(
+                                    response
+                                );
+                            });
+                        })
+                    );
+                    socketIndex++;
+                }
+
+                callback(responses.reduce((acc, val) => acc.concat(val), []));
             });
 
             socket.on('disconnect', (reason: string) => {
-                botConnections = io.sockets.adapter.rooms.get('Bots') ? io.sockets.adapter.rooms.get('Bots').size : 0;
+                botConnections = io.sockets.adapter.rooms.get('BotClients') ? io.sockets.adapter.rooms.get('BotClients').size : 0;
                 console.log(`[WebSocket] (BOT_CLIENT) Socket ${socket.id} disconnected. (${reason}) ${botConnections} connected clients.`);
             });
-        } else if (socket.handshake.auth.client == 'RequestClient') {
+        } else if (socket.handshake.auth.type == 'RequestClient') {
             socket.join('RequestClients');
 
             requestClientConnections = io.sockets.adapter.rooms.get('RequestClients') ? io.sockets.adapter.rooms.get('RequestClients').size : 0;
@@ -106,7 +186,7 @@ io.use((socket, next) => {
         }
 
     } catch (e) {
-        console.log(e.toString());
+        console.log('Error:', e.toString());
     }
 });
 
