@@ -10,6 +10,7 @@ const { port, auth: authorization } = require('./config');
 const server = createServer(app);
 const io = new Server(server);
 
+const botClientData = new Map();
 const requestClientData = new Map();
 
 // Settings
@@ -37,10 +38,21 @@ app.get('/', (req, res) => {
             ? Array.from(io.sockets.adapter.rooms.get('BotClients').keys()).map(
                 (socketID) => {
                     const socket = io.sockets.sockets.get(socketID);
+
+                    const lastRequest: number = botClientData.get(socketID)
+                        ? botClientData.get(socketID).timestamp || 0
+                        : 0;
+
+                    const latency: number = botClientData.get(socketID)
+                        ? botClientData.get(socketID).latency || 0
+                        : 0;
+
                     return {
                         socketID: socketID,
                         client: socket.handshake.auth.client,
-                        type: socket.handshake.auth.type
+                        type: socket.handshake.auth.type,
+                        latency: latency,
+                        lastRequest: lastRequest
                     };
                 }
             )
@@ -50,10 +62,21 @@ app.get('/', (req, res) => {
                 io.sockets.adapter.rooms.get('RequestClients').keys()
             ).map((socketID) => {
                 const socket = io.sockets.sockets.get(socketID);
+
+                const lastRequest: number = requestClientData.get(socketID)
+                    ? requestClientData.get(socketID).timestamp || 0
+                    : 0;
+
+                const latency: number = requestClientData.get(socketID)
+                    ? requestClientData.get(socketID).latency || 0
+                    : 0;
+
                 return {
                     socketID: socketID,
                     client: socket.handshake.auth.client,
-                    type: socket.handshake.auth.type
+                    type: socket.handshake.auth.type,
+                    latency: latency,
+                    lastRequest: lastRequest
                 };
             })
             : []
@@ -69,6 +92,69 @@ setInterval(() => {
 
     requestClientConnections = requestClients ? requestClients.size : 0;
 }, 50);
+
+setInterval(async () => {
+    const sockets: string[] = io.sockets.adapter.rooms.get('RequestClients')
+        ? Array.from(io.sockets.adapter.rooms.get('RequestClients').keys())
+        : [];
+
+    const promises = [];
+
+    for (const socketID of sockets) {
+        const startTime = new Date().getTime();
+        promises.push(
+            new Promise((resolve) => {
+                io.sockets.sockets.get(socketID).emit('ping', () => {
+                    const endTime = new Date().getTime();
+                    const ping = endTime - startTime;
+
+                    requestClientData.set(
+                        socketID,
+                        Object.assign({}, requestClientData.get(socketID), {
+                            latency: ping
+                        })
+                    );
+                    resolve(ping);
+                });
+            })
+        );
+    }
+
+    await Promise.all(promises);
+
+}, 500);
+
+setInterval(async () => {
+    const sockets: string[] = io.sockets.adapter.rooms.get('BotClients')
+        ? Array.from(io.sockets.adapter.rooms.get('BotClients').keys())
+        : [];
+
+    const promises = [];
+
+    for (const socketID of sockets) {
+        const startTime = new Date().getTime();
+        promises.push(
+            new Promise((resolve) => {
+                io.sockets.sockets.get(socketID).emit('ping', () => {
+                    const endTime = new Date().getTime();
+                    const ping = endTime - startTime;
+
+                    botClientData.set(
+                        socketID,
+                        Object.assign({}, botClientData.get(socketID), {
+                            latency: ping
+                        })
+                    );
+                    resolve(ping);
+                });
+            })
+        );
+    }
+
+    await Promise.all(promises);
+
+}, 500);
+
 
 io.use((socket, next) => {
     if (socket.handshake.auth && socket.handshake.auth.token) {
@@ -127,13 +213,20 @@ io.use((socket, next) => {
 
                 const socketID = sockets.sort((a: string, b: string) => {
                     const aTimestamp: number = requestClientData.get(a)
-                        ? requestClientData.get(a).timestamp
+                        ? requestClientData.get(a).timestamp || 0
                         : 0;
                     const bTimestamp: number = requestClientData.get(b)
-                        ? requestClientData.get(b).timestamp
+                        ? requestClientData.get(b).timestamp || 0
                         : 0;
                     return aTimestamp - bTimestamp;
                 })[0];
+
+                botClientData.set(
+                    socket.id,
+                    Object.assign({}, botClientData.get(socket.id), {
+                        timestamp: Date.now()
+                    })
+                );
 
                 requestClientData.set(
                     socketID,
@@ -159,10 +252,10 @@ io.use((socket, next) => {
                             .keys()
                     ).sort((a: string, b: string) => {
                         const aTimestamp: number = requestClientData.get(a)
-                            ? requestClientData.get(a).timestamp
+                            ? requestClientData.get(a).timestamp || 0
                             : 0;
                         const bTimestamp: number = requestClientData.get(b)
-                            ? requestClientData.get(b).timestamp
+                            ? requestClientData.get(b).timestamp || 0
                             : 0;
                         return aTimestamp - bTimestamp;
                     })
@@ -178,6 +271,13 @@ io.use((socket, next) => {
                         }
                     });
 
+                botClientData.set(
+                    socket.id,
+                    Object.assign({}, botClientData.get(socket.id), {
+                        timestamp: Date.now()
+                    })
+                );
+                
                 let requestIndex = 0;
 
                 const requestsArr = requests.map((request) => {
