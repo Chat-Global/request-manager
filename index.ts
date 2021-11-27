@@ -96,7 +96,7 @@ io.use((socket, next) => {
             );
 
             socket.on('error', (err: any) => {
-                console.log('Socket error');
+                console.log('[WebSocket] (BOT_CLIENT) Socket error');
                 if (err) {
                     socket.disconnect();
                 }
@@ -219,12 +219,6 @@ io.use((socket, next) => {
 
                     promises.push(
                         new Promise((resolve) => {
-                            console.log(
-                                `Emitiendo request a ${io.sockets.sockets.get(socketID).handshake
-                                    .auth.client
-                                } ==>`,
-                                socketRequests
-                            );
                             io.sockets.sockets
                                 .get(socketID)
                                 .emit(
@@ -268,7 +262,7 @@ io.use((socket, next) => {
             );
 
             socket.on('error', (err: any) => {
-                console.log('Socket error');
+                console.log('[WebSocket] (REQUEST_CLIENT) Socket error');
                 if (err) {
                     socket.disconnect();
                 }
