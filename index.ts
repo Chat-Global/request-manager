@@ -5,7 +5,7 @@ const express = require('express');
 
 const app = express();
 
-const { port, auth: authorization } = require('./config');
+const config = require('./config');
 
 const server = createServer(app);
 const io = new Server(server);
@@ -15,7 +15,7 @@ const requestClientData = new Map();
 
 // Settings
 
-app.set('port', port);
+app.set('port', config.port);
 app.set('json spaces', 2);
 
 // Middlewares
@@ -49,7 +49,8 @@ app.get('/', (req, res) => {
 
                     return {
                         socketID: socketID,
-                        client: socket.handshake.auth.client,
+                        clientID: socket.handshake.auth.clientID,
+                        clientName: socket.handshake.auth.clientName,
                         type: socket.handshake.auth.type,
                         latency: latency,
                         lastRequest: lastRequest
@@ -73,7 +74,8 @@ app.get('/', (req, res) => {
 
                 return {
                     socketID: socketID,
-                    client: socket.handshake.auth.client,
+                    clientID: socket.handshake.auth.clientID,
+                    clientName: socket.handshake.auth.clientName,
                     type: socket.handshake.auth.type,
                     latency: latency,
                     lastRequest: lastRequest
@@ -157,16 +159,28 @@ setInterval(async () => {
 
 
 io.use((socket, next) => {
-    if (socket.handshake.auth && socket.handshake.auth.token) {
-        if (!socket.handshake.auth.client)
+    if (socket.handshake.auth && socket.handshake.auth.token && socket.handshake.auth.secret && socket.handshake.auth.apiKey) {
+
+        if (!socket.handshake.auth.clientName) {
             return next(new Error('Malformed handshake auth error'));
-        if (socket.handshake.auth.token !== authorization) {
-            return next(new Error('Authentication error'));
-        } else {
-            next();
         }
+        if (!socket.handshake.auth.clientID) {
+            return next(new Error('Malformed handshake auth error'));
+        }
+        if (socket.handshake.auth.token !== config.auth.token) {
+            return next(new Error('Authentication error'));
+        }
+        if (socket.handshake.auth.secret !== config.auth.secret) {
+            return next(new Error('Authentication error'));
+        }
+        if (socket.handshake.auth.apiKey !== config.auth.apiKey) {
+            return next(new Error('Authentication error'));
+        }
+
+        return next();
+    
     } else {
-        next(new Error('Authentication error'));
+        return next(new Error('Authentication error'));
     }
 }).on('connection', (socket) => {
     try {
