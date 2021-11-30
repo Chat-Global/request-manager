@@ -311,7 +311,7 @@ io.use((socket, next) => {
 
                 for (let i = socketsSize; i > 0; i--) {
                     chunkedRequests.push(
-                        array.splice(0, Math.ceil(requestsArrLength / i))
+                        array.splice(0, Math.ceil(requestsArrLength / (i + 1)))
                     );
                 }
 
